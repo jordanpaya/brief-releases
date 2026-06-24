@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -11,50 +11,106 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Stepper } from '../components/Stepper';
 import { TabIcon } from '../components/TabIcon';
 import { useStore } from '../store';
 import { colors, fonts, font, radius, shadow, space } from '../theme';
-import { Exercise } from '../types';
-import { formatWeight, relativeDay, weightStep } from '../utils';
+import { Exercise, SetEntry } from '../types';
+import { formatWeight, getPreviousSession, relativeDay, todayISO } from '../utils';
 
-type Draft = { weight: number; reps: number };
+// ---- one editable number cell (commits on blur) ----------------------------
+function Cell({
+  initial,
+  onCommit,
+  kind,
+  placeholder,
+}: {
+  initial: string;
+  onCommit: (raw: string) => void;
+  kind: 'weight' | 'reps';
+  placeholder?: string;
+}) {
+  const [t, setT] = useState(initial);
+  const [focused, setFocused] = useState(false);
+
+  // Keep in sync when the underlying value changes (e.g. after logging a set).
+  useEffect(() => {
+    if (!focused) setT(initial);
+  }, [initial, focused]);
+
+  return (
+    <TextInput
+      style={[styles.cell, focused && styles.cellFocus]}
+      value={t}
+      placeholder={placeholder}
+      placeholderTextColor={colors.textFaint}
+      onChangeText={setT}
+      onFocus={() => setFocused(true)}
+      onBlur={() => {
+        setFocused(false);
+        onCommit(t);
+      }}
+      keyboardType={kind === 'reps' ? 'number-pad' : 'decimal-pad'}
+      selectTextOnFocus
+      returnKeyType="done"
+      maxLength={kind === 'reps' ? 3 : 6}
+    />
+  );
+}
+
+function Check({ done, onPress }: { done: boolean; onPress: () => void }) {
+  return (
+    <Pressable
+      style={[styles.check, done ? styles.checkDone : styles.checkAdd]}
+      onPress={onPress}
+      hitSlop={8}
+    >
+      <Text style={[styles.checkMark, { color: done ? colors.green : colors.white }]}>✓</Text>
+    </Pressable>
+  );
+}
+
+type Entry = { weight: string; reps: string };
 
 export function LogScreen() {
-  const { data, addExercise, removeExercise, renameExercise, addSet, removeSet, setUnit, lastSet, todaysSets } =
+  const { data, addExercise, removeExercise, renameExercise, addSet, updateSet, removeSet, setUnit, lastSet, todaysSets, setsFor } =
     useStore();
   const { exercises, unit } = data;
 
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [drafts, setDrafts] = useState<Record<string, Draft>>({});
+  const [entries, setEntries] = useState<Record<string, Entry>>({});
   const [showAdd, setShowAdd] = useState(false);
   const [newName, setNewName] = useState('');
 
-  const defaultDraft = useMemo<Draft>(() => ({ weight: unit === 'kg' ? 20 : 45, reps: 5 }), [unit]);
+  const defaultEntry = useMemo<Entry>(
+    () => ({ weight: String(unit === 'kg' ? 20 : 45), reps: '5' }),
+    [unit],
+  );
 
-  const draftFor = (id: string): Draft => drafts[id] ?? seedDraft(id);
-
-  function seedDraft(id: string): Draft {
+  function seedEntry(id: string): Entry {
     const last = lastSet(id);
-    return last ? { weight: last.weight, reps: last.reps } : defaultDraft;
+    return last ? { weight: formatWeight(last.weight), reps: String(last.reps) } : defaultEntry;
   }
 
-  function setDraft(id: string, patch: Partial<Draft>) {
-    setDrafts((d) => ({ ...d, [id]: { ...draftFor(id), ...patch } }));
+  const entryFor = (id: string): Entry => entries[id] ?? seedEntry(id);
+
+  function setEntry(id: string, patch: Partial<Entry>) {
+    setEntries((e) => ({ ...e, [id]: { ...entryFor(id), ...patch } }));
   }
 
   function toggle(id: string) {
     setExpanded((cur) => {
       const next = cur === id ? null : id;
-      if (next && !drafts[id]) setDrafts((d) => ({ ...d, [id]: seedDraft(id) }));
+      if (next && !entries[id]) setEntries((e) => ({ ...e, [id]: seedEntry(id) }));
       return next;
     });
   }
 
-  function onAddSet(id: string) {
-    const d = draftFor(id);
-    if (d.reps <= 0) return;
-    addSet(id, d.weight, d.reps);
+  function commitEntry(id: string) {
+    const e = entryFor(id);
+    const w = parseFloat(e.weight);
+    const r = parseInt(e.reps, 10);
+    if (Number.isNaN(w) || w < 0 || Number.isNaN(r) || r <= 0) return;
+    addSet(id, w, r);
   }
 
   function onCreateExercise() {
@@ -63,7 +119,7 @@ export function LogScreen() {
     setShowAdd(false);
     if (created) {
       setExpanded(created.id);
-      setDrafts((d) => ({ ...d, [created.id]: defaultDraft }));
+      setEntries((e) => ({ ...e, [created.id]: defaultEntry }));
     }
   }
 
@@ -88,31 +144,20 @@ export function LogScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={styles.header}>
         <View style={styles.flex}>
           <Text style={styles.title}>Lift Log</Text>
           <Text style={styles.subtitle}>Tap a lift, bang in your sets</Text>
         </View>
-        <Pressable
-          style={styles.unitToggle}
-          onPress={() => setUnit(unit === 'lb' ? 'kg' : 'lb')}
-          hitSlop={8}
-        >
+        <Pressable style={styles.unitToggle} onPress={() => setUnit(unit === 'lb' ? 'kg' : 'lb')} hitSlop={8}>
           <Text style={[styles.unitText, unit === 'lb' && styles.unitActive]}>lb</Text>
           <Text style={styles.unitSlash}>/</Text>
           <Text style={[styles.unitText, unit === 'kg' && styles.unitActive]}>kg</Text>
         </Pressable>
       </View>
 
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         {exercises.length === 0 ? (
           <View style={styles.empty}>
             <TabIcon name="log" color={colors.textFaint} size={52} />
@@ -126,7 +171,12 @@ export function LogScreen() {
             const open = expanded === ex.id;
             const last = lastSet(ex.id);
             const today = todaysSets(ex.id);
-            const d = draftFor(ex.id);
+            const prev = open ? getPreviousSession(setsFor(ex.id), todayISO()) : [];
+            const entry = entryFor(ex.id);
+            const prevText = (i: number) => {
+              const p = prev[i];
+              return p ? `${formatWeight(p.weight)} × ${p.reps}` : '—';
+            };
             return (
               <View key={ex.id} style={styles.card}>
                 <Pressable onPress={() => toggle(ex.id)} onLongPress={() => onLongPress(ex)}>
@@ -134,7 +184,9 @@ export function LogScreen() {
                     <View style={styles.flex}>
                       <Text style={styles.exName}>{ex.name}</Text>
                       <Text style={styles.exSub}>
-                        {last
+                        {today.length > 0
+                          ? `${today.length} set${today.length > 1 ? 's' : ''} today`
+                          : last
                           ? `Last: ${formatWeight(last.weight)} ${unit} × ${last.reps} · ${relativeDay(last.date)}`
                           : 'No sets logged yet'}
                       </Text>
@@ -150,42 +202,68 @@ export function LogScreen() {
 
                 {open ? (
                   <View style={styles.body}>
-                    <View style={styles.steppers}>
-                      <Stepper
-                        label="Weight"
-                        value={d.weight}
-                        step={weightStep(unit, d.weight)}
-                        onChange={(v) => setDraft(ex.id, { weight: v })}
-                        suffix={unit}
-                      />
-                      <View style={{ width: space.md }} />
-                      <Stepper
-                        label="Reps"
-                        value={d.reps}
-                        step={1}
-                        min={1}
-                        onChange={(v) => setDraft(ex.id, { reps: Math.round(v) })}
-                      />
+                    {/* column headers */}
+                    <View style={styles.row}>
+                      <Text style={[styles.hSet, styles.colHead]}>SET</Text>
+                      <Text style={[styles.hPrev, styles.colHead]}>PREVIOUS</Text>
+                      <Text style={[styles.hCell, styles.colHead]}>{unit.toUpperCase()}</Text>
+                      <Text style={[styles.hCell, styles.colHead]}>REPS</Text>
+                      <View style={styles.hCheck} />
                     </View>
 
-                    <Pressable style={styles.addBtn} onPress={() => onAddSet(ex.id)}>
-                      <Text style={styles.addBtnText}>+ Add set</Text>
-                    </Pressable>
-
-                    {today.length > 0 ? (
-                      <View style={styles.chips}>
-                        {today.map((s) => (
-                          <Pressable key={s.id} style={styles.chip} onPress={() => removeSet(s.id)}>
-                            <Text style={styles.chipText}>
-                              {formatWeight(s.weight)} × {s.reps}
-                            </Text>
-                            <Text style={styles.chipX}>✕</Text>
-                          </Pressable>
-                        ))}
+                    {/* logged sets */}
+                    {today.map((s: SetEntry, i: number) => (
+                      <View key={s.id} style={[styles.row, styles.rowDivider]}>
+                        <View style={styles.setBadgeWrap}>
+                          <View style={styles.setBadge}>
+                            <Text style={styles.setBadgeText}>{i + 1}</Text>
+                          </View>
+                        </View>
+                        <Text style={styles.prev} numberOfLines={1}>{prevText(i)}</Text>
+                        <Cell
+                          initial={formatWeight(s.weight)}
+                          kind="weight"
+                          onCommit={(raw) => {
+                            const n = parseFloat(raw);
+                            if (!Number.isNaN(n) && n >= 0) updateSet(s.id, n, s.reps);
+                          }}
+                        />
+                        <Cell
+                          initial={String(s.reps)}
+                          kind="reps"
+                          onCommit={(raw) => {
+                            const n = parseInt(raw, 10);
+                            if (!Number.isNaN(n) && n > 0) updateSet(s.id, s.weight, n);
+                          }}
+                        />
+                        <Check done onPress={() => removeSet(s.id)} />
                       </View>
-                    ) : (
-                      <Text style={styles.hint}>No sets today — log your first one above.</Text>
-                    )}
+                    ))}
+
+                    {/* active entry row */}
+                    <View style={[styles.row, styles.rowDivider, styles.entryRow]}>
+                      <View style={styles.setBadgeWrap}>
+                        <View style={[styles.setBadge, styles.setBadgeNext]}>
+                          <Text style={styles.setBadgeNextText}>{today.length + 1}</Text>
+                        </View>
+                      </View>
+                      <Text style={[styles.prev, styles.prevFaint]} numberOfLines={1}>{prevText(today.length)}</Text>
+                      <Cell
+                        initial={entry.weight}
+                        kind="weight"
+                        placeholder="0"
+                        onCommit={(raw) => setEntry(ex.id, { weight: raw })}
+                      />
+                      <Cell
+                        initial={entry.reps}
+                        kind="reps"
+                        placeholder="0"
+                        onCommit={(raw) => setEntry(ex.id, { reps: raw })}
+                      />
+                      <Check done={false} onPress={() => commitEntry(ex.id)} />
+                    </View>
+
+                    <Text style={styles.hint}>Fill the row and tap ✓ to log. Tap a green ✓ to undo.</Text>
                   </View>
                 ) : null}
               </View>
@@ -213,13 +291,7 @@ export function LogScreen() {
               onSubmitEditing={onCreateExercise}
             />
             <View style={styles.modalRow}>
-              <Pressable
-                style={[styles.modalBtn, styles.modalCancel]}
-                onPress={() => {
-                  setShowAdd(false);
-                  setNewName('');
-                }}
-              >
+              <Pressable style={[styles.modalBtn, styles.modalCancel]} onPress={() => { setShowAdd(false); setNewName(''); }}>
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </Pressable>
               <Pressable style={[styles.modalBtn, styles.modalSave]} onPress={onCreateExercise}>
@@ -232,6 +304,9 @@ export function LogScreen() {
     </KeyboardAvoidingView>
   );
 }
+
+const CELL_W = 58;
+const CHECK_W = 38;
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
@@ -282,27 +357,59 @@ const styles = StyleSheet.create({
   todayBadgeText: { color: colors.white, fontSize: font.small, fontFamily: fonts.bold },
   chev: { color: colors.textFaint, fontSize: 22, width: 18, textAlign: 'center', fontFamily: fonts.regular },
   body: { paddingHorizontal: space.lg, paddingBottom: space.lg },
-  steppers: { flexDirection: 'row', marginBottom: space.md },
-  addBtn: {
-    backgroundColor: colors.black,
-    borderRadius: radius.pill,
-    paddingVertical: space.lg,
-    alignItems: 'center',
-  },
-  addBtnText: { color: colors.white, fontSize: font.body, fontFamily: fonts.bold },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', marginTop: space.md, gap: space.sm },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
+
+  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: space.sm, gap: 6 },
+  rowDivider: { borderTopWidth: 1, borderTopColor: colors.border },
+  entryRow: {},
+  colHead: { color: colors.textFaint, fontSize: font.tiny, fontFamily: fonts.bold, letterSpacing: 0.6 },
+  hSet: { width: 30 },
+  hPrev: { flex: 1, paddingLeft: 2 },
+  hCell: { width: CELL_W, textAlign: 'center' },
+  hCheck: { width: CHECK_W },
+
+  setBadgeWrap: { width: 30 },
+  setBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.pill,
-    paddingVertical: 8,
-    paddingHorizontal: space.md,
-    gap: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  chipText: { color: colors.text, fontSize: font.small, fontFamily: fonts.bold },
-  chipX: { color: colors.textFaint, fontSize: font.tiny, fontFamily: fonts.regular },
-  hint: { color: colors.textFaint, fontSize: font.small, fontFamily: fonts.regular, marginTop: space.md },
+  setBadgeText: { color: colors.text, fontSize: font.small, fontFamily: fonts.black },
+  setBadgeNext: { backgroundColor: colors.bg, borderWidth: 1.5, borderColor: colors.borderStrong },
+  setBadgeNextText: { color: colors.textFaint, fontSize: font.small, fontFamily: fonts.black },
+  prev: { flex: 1, color: colors.textDim, fontSize: font.small, fontFamily: fonts.semibold, paddingLeft: 2 },
+  prevFaint: { color: colors.textFaint },
+
+  cell: {
+    width: CELL_W,
+    height: 42,
+    borderRadius: radius.sm,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+    textAlign: 'center',
+    color: colors.text,
+    fontSize: font.body,
+    fontFamily: fonts.black,
+    padding: 0,
+  },
+  cellFocus: { backgroundColor: colors.bg, borderColor: colors.black },
+
+  check: {
+    width: CHECK_W,
+    height: 38,
+    borderRadius: radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkAdd: { backgroundColor: colors.black },
+  checkDone: { backgroundColor: colors.greenTint },
+  checkMark: { fontSize: 17, fontFamily: fonts.black, marginTop: -1 },
+
+  hint: { color: colors.textFaint, fontSize: font.tiny, fontFamily: fonts.regular, marginTop: space.md },
+
   newBtn: {
     borderWidth: 1.5,
     borderColor: colors.borderStrong,
@@ -315,12 +422,7 @@ const styles = StyleSheet.create({
   empty: { alignItems: 'center', paddingVertical: space.xxl, paddingHorizontal: space.lg, gap: space.md },
   emptyTitle: { color: colors.text, fontSize: font.title, fontFamily: fonts.black },
   emptyText: { color: colors.textDim, fontSize: font.body, fontFamily: fonts.regular, textAlign: 'center', lineHeight: 22 },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'center',
-    paddingHorizontal: space.xl,
-  },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', paddingHorizontal: space.xl },
   modalCard: { backgroundColor: colors.surface, borderRadius: radius.lg, padding: space.xl, ...shadow },
   modalTitle: { color: colors.text, fontSize: font.h2, fontFamily: fonts.black, marginBottom: space.md },
   input: {

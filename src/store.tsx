@@ -14,6 +14,7 @@ type Store = {
   removeExercise: (id: string) => void;
   renameExercise: (id: string, name: string) => void;
   addSet: (exerciseId: string, weight: number, reps: number) => void;
+  updateSet: (id: string, weight: number, reps: number) => void;
   removeSet: (id: string) => void;
   setUnit: (unit: Unit) => void;
   setsFor: (exerciseId: string) => SetEntry[];
@@ -98,6 +99,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setData((d) => ({ ...d, sets: [...d.sets, entry] }));
   }, []);
 
+  const updateSet = useCallback<Store['updateSet']>((id, weight, reps) => {
+    if (weight < 0 || reps <= 0) return;
+    setData((d) => ({
+      ...d,
+      sets: d.sets.map((s) => (s.id === id ? { ...s, weight, reps } : s)),
+    }));
+  }, []);
+
   const removeSet = useCallback<Store['removeSet']>((id) => {
     setData((d) => ({ ...d, sets: d.sets.filter((s) => s.id !== id) }));
   }, []);
@@ -140,6 +149,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     removeExercise,
     renameExercise,
     addSet,
+    updateSet,
     removeSet,
     setUnit,
     setsFor,

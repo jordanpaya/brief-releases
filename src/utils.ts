@@ -59,6 +59,15 @@ export function formatWeight(n: number): string {
   return Number.isInteger(n) ? String(n) : n.toFixed(1);
 }
 
+// The sets from the most recent day strictly before `excludeDate`, in order.
+// This is the "Previous" reference column — what you did last time.
+export function getPreviousSession(sets: SetEntry[], excludeDate: string): SetEntry[] {
+  const dates = Array.from(new Set(sets.map((s) => s.date))).filter((d) => d < excludeDate).sort();
+  if (dates.length === 0) return [];
+  const target = dates[dates.length - 1];
+  return sets.filter((s) => s.date === target).sort((a, b) => a.createdAt - b.createdAt);
+}
+
 // Group an exercise's sets into per-day sessions, sorted oldest -> newest.
 export function buildSessions(sets: SetEntry[]): Session[] {
   const byDate = new Map<string, SetEntry[]>();
