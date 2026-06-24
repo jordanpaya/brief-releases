@@ -1,6 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { colors, font, radius, space } from '../theme';
+import { colors, fonts, font, radius, space } from '../theme';
 import { formatWeight } from '../utils';
 
 // A big −/+ stepper with an editable value in the middle. Built for thumbs:
@@ -65,19 +65,19 @@ const styles = StyleSheet.create({
   },
   label: {
     color: colors.textDim,
-    fontSize: font.small,
-    fontWeight: '600',
-    marginBottom: space.xs,
+    fontSize: font.tiny,
+    fontFamily: fonts.bold,
+    marginBottom: space.sm,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   btn: {
-    width: 46,
-    height: 52,
+    width: 48,
+    height: 54,
     borderRadius: radius.sm,
     backgroundColor: colors.surfaceAlt,
     alignItems: 'center',
@@ -86,12 +86,12 @@ const styles = StyleSheet.create({
   btnText: {
     color: colors.text,
     fontSize: 26,
-    fontWeight: '500',
+    fontFamily: fonts.semibold,
     marginTop: -2,
   },
   valueBox: {
     flex: 1,
-    height: 52,
+    height: 54,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -99,8 +99,8 @@ const styles = StyleSheet.create({
   },
   value: {
     color: colors.text,
-    fontSize: 26,
-    fontWeight: '700',
+    fontSize: 27,
+    fontFamily: fonts.black,
     textAlign: 'center',
     minWidth: 40,
     padding: 0,
@@ -108,6 +108,6 @@ const styles = StyleSheet.create({
   suffix: {
     color: colors.textDim,
     fontSize: font.body,
-    fontWeight: '600',
+    fontFamily: fonts.bold,
   },
 });

@@ -11,7 +11,7 @@ export function LineChart({
   data,
   width,
   height = 120,
-  color = colors.accent,
+  color = colors.black,
 }: {
   data: Point[];
   width: number;
@@ -52,7 +52,7 @@ export function LineChart({
     <Svg width={width} height={height}>
       {/* baseline */}
       <Line x1={padX} y1={padY + h} x2={padX + w} y2={padY + h} stroke={colors.border} strokeWidth={1} />
-      {areaPath ? <Path d={areaPath} fill={color} opacity={0.12} /> : null}
+      {areaPath ? <Path d={areaPath} fill={color} opacity={0.07} /> : null}
       {points.length > 1 ? (
         <Path d={linePath} stroke={color} strokeWidth={2.5} fill="none" />
       ) : null}

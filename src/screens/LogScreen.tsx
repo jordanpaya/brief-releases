@@ -12,8 +12,9 @@ import {
   View,
 } from 'react-native';
 import { Stepper } from '../components/Stepper';
+import { TabIcon } from '../components/TabIcon';
 import { useStore } from '../store';
-import { colors, font, radius, space } from '../theme';
+import { colors, fonts, font, radius, shadow, space } from '../theme';
 import { Exercise } from '../types';
 import { formatWeight, relativeDay, weightStep } from '../utils';
 
@@ -92,9 +93,9 @@ export function LogScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <View style={styles.header}>
-        <View>
+        <View style={styles.flex}>
           <Text style={styles.title}>Lift Log</Text>
-          <Text style={styles.subtitle}>Today · tap a lift, bang in your sets</Text>
+          <Text style={styles.subtitle}>Tap a lift, bang in your sets</Text>
         </View>
         <Pressable
           style={styles.unitToggle}
@@ -114,7 +115,7 @@ export function LogScreen() {
       >
         {exercises.length === 0 ? (
           <View style={styles.empty}>
-            <Text style={styles.emptyEmoji}>🏋️</Text>
+            <TabIcon name="log" color={colors.textFaint} size={52} />
             <Text style={styles.emptyTitle}>No lifts yet</Text>
             <Text style={styles.emptyText}>
               Add your first exercise — bench, squat, whatever you train — and start logging.
@@ -173,12 +174,8 @@ export function LogScreen() {
 
                     {today.length > 0 ? (
                       <View style={styles.chips}>
-                        {today.map((s, i) => (
-                          <Pressable
-                            key={s.id}
-                            style={styles.chip}
-                            onPress={() => removeSet(s.id)}
-                          >
+                        {today.map((s) => (
+                          <Pressable key={s.id} style={styles.chip} onPress={() => removeSet(s.id)}>
                             <Text style={styles.chipText}>
                               {formatWeight(s.weight)} × {s.reps}
                             </Text>
@@ -225,10 +222,7 @@ export function LogScreen() {
               >
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </Pressable>
-              <Pressable
-                style={[styles.modalBtn, styles.modalSave]}
-                onPress={onCreateExercise}
-              >
+              <Pressable style={[styles.modalBtn, styles.modalSave]} onPress={onCreateExercise}>
                 <Text style={styles.modalSaveText}>Add</Text>
               </Pressable>
             </View>
@@ -246,95 +240,89 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     paddingHorizontal: space.lg,
-    paddingBottom: space.md,
+    paddingTop: space.sm,
+    paddingBottom: space.lg,
   },
-  title: { color: colors.text, fontSize: font.display, fontWeight: '800', letterSpacing: -0.5 },
-  subtitle: { color: colors.textDim, fontSize: font.small, marginTop: 2 },
+  title: { color: colors.text, fontSize: font.display, fontFamily: fonts.black, letterSpacing: -0.5 },
+  subtitle: { color: colors.textDim, fontSize: font.small, fontFamily: fonts.regular, marginTop: 2 },
   unitToggle: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceAlt,
     borderRadius: radius.pill,
     paddingHorizontal: space.md,
     paddingVertical: space.sm,
     marginTop: space.sm,
   },
-  unitText: { color: colors.textFaint, fontSize: font.body, fontWeight: '700' },
-  unitActive: { color: colors.accent },
-  unitSlash: { color: colors.textFaint, marginHorizontal: 3 },
+  unitText: { color: colors.textFaint, fontSize: font.body, fontFamily: fonts.bold },
+  unitActive: { color: colors.black },
+  unitSlash: { color: colors.textFaint, marginHorizontal: 3, fontFamily: fonts.regular },
   scroll: { paddingHorizontal: space.lg, paddingBottom: space.xxl * 2 },
   card: {
     backgroundColor: colors.surface,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     marginBottom: space.md,
-    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadow,
   },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: space.lg,
-  },
-  exName: { color: colors.text, fontSize: font.h2, fontWeight: '700' },
-  exSub: { color: colors.textDim, fontSize: font.small, marginTop: 3 },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', padding: space.lg },
+  exName: { color: colors.text, fontSize: font.h2, fontFamily: fonts.bold },
+  exSub: { color: colors.textDim, fontSize: font.small, fontFamily: fonts.regular, marginTop: 3 },
   todayBadge: {
     minWidth: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: colors.accentDim,
+    backgroundColor: colors.black,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 6,
     marginRight: space.sm,
   },
-  todayBadgeText: { color: colors.accent, fontSize: font.small, fontWeight: '800' },
-  chev: { color: colors.textFaint, fontSize: 22, fontWeight: '600', width: 18, textAlign: 'center' },
-  body: {
-    paddingHorizontal: space.lg,
-    paddingBottom: space.lg,
-  },
+  todayBadgeText: { color: colors.white, fontSize: font.small, fontFamily: fonts.bold },
+  chev: { color: colors.textFaint, fontSize: 22, width: 18, textAlign: 'center', fontFamily: fonts.regular },
+  body: { paddingHorizontal: space.lg, paddingBottom: space.lg },
   steppers: { flexDirection: 'row', marginBottom: space.md },
   addBtn: {
-    backgroundColor: colors.accent,
-    borderRadius: radius.sm,
-    paddingVertical: space.md,
+    backgroundColor: colors.black,
+    borderRadius: radius.pill,
+    paddingVertical: space.lg,
     alignItems: 'center',
   },
-  addBtnText: { color: colors.bg, fontSize: font.body, fontWeight: '800' },
+  addBtnText: { color: colors.white, fontSize: font.body, fontFamily: fonts.bold },
   chips: { flexDirection: 'row', flexWrap: 'wrap', marginTop: space.md, gap: space.sm },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.surfaceAlt,
     borderRadius: radius.pill,
-    paddingVertical: 7,
+    paddingVertical: 8,
     paddingHorizontal: space.md,
     gap: 8,
   },
-  chipText: { color: colors.text, fontSize: font.small, fontWeight: '700' },
-  chipX: { color: colors.textFaint, fontSize: font.tiny },
-  hint: { color: colors.textFaint, fontSize: font.small, marginTop: space.md },
+  chipText: { color: colors.text, fontSize: font.small, fontFamily: fonts.bold },
+  chipX: { color: colors.textFaint, fontSize: font.tiny, fontFamily: fonts.regular },
+  hint: { color: colors.textFaint, fontSize: font.small, fontFamily: fonts.regular, marginTop: space.md },
   newBtn: {
     borderWidth: 1.5,
-    borderColor: colors.border,
-    borderStyle: 'dashed',
-    borderRadius: radius.md,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.lg,
     paddingVertical: space.lg,
     alignItems: 'center',
     marginTop: space.xs,
   },
-  newBtnText: { color: colors.textDim, fontSize: font.body, fontWeight: '700' },
-  empty: { alignItems: 'center', paddingVertical: space.xxl, paddingHorizontal: space.lg },
-  emptyEmoji: { fontSize: 44, marginBottom: space.md },
-  emptyTitle: { color: colors.text, fontSize: font.title, fontWeight: '800', marginBottom: space.sm },
-  emptyText: { color: colors.textDim, fontSize: font.body, textAlign: 'center', lineHeight: 22 },
+  newBtnText: { color: colors.text, fontSize: font.body, fontFamily: fonts.bold },
+  empty: { alignItems: 'center', paddingVertical: space.xxl, paddingHorizontal: space.lg, gap: space.md },
+  emptyTitle: { color: colors.text, fontSize: font.title, fontFamily: fonts.black },
+  emptyText: { color: colors.textDim, fontSize: font.body, fontFamily: fonts.regular, textAlign: 'center', lineHeight: 22 },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(0,0,0,0.4)',
     justifyContent: 'center',
     paddingHorizontal: space.xl,
   },
-  modalCard: { backgroundColor: colors.surface, borderRadius: radius.lg, padding: space.xl },
-  modalTitle: { color: colors.text, fontSize: font.h2, fontWeight: '800', marginBottom: space.md },
+  modalCard: { backgroundColor: colors.surface, borderRadius: radius.lg, padding: space.xl, ...shadow },
+  modalTitle: { color: colors.text, fontSize: font.h2, fontFamily: fonts.black, marginBottom: space.md },
   input: {
     backgroundColor: colors.surfaceAlt,
     borderRadius: radius.sm,
@@ -342,12 +330,13 @@ const styles = StyleSheet.create({
     paddingVertical: space.md,
     color: colors.text,
     fontSize: font.body,
+    fontFamily: fonts.semibold,
     marginBottom: space.lg,
   },
   modalRow: { flexDirection: 'row', gap: space.md },
-  modalBtn: { flex: 1, paddingVertical: space.md, borderRadius: radius.sm, alignItems: 'center' },
+  modalBtn: { flex: 1, paddingVertical: space.md, borderRadius: radius.pill, alignItems: 'center' },
   modalCancel: { backgroundColor: colors.surfaceAlt },
-  modalCancelText: { color: colors.textDim, fontSize: font.body, fontWeight: '700' },
-  modalSave: { backgroundColor: colors.accent },
-  modalSaveText: { color: colors.bg, fontSize: font.body, fontWeight: '800' },
+  modalCancelText: { color: colors.textDim, fontSize: font.body, fontFamily: fonts.bold },
+  modalSave: { backgroundColor: colors.black },
+  modalSaveText: { color: colors.white, fontSize: font.body, fontFamily: fonts.bold },
 });

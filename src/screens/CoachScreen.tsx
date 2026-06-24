@@ -1,24 +1,18 @@
 import React, { useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { getSuggestion, Suggestion, SuggestionKind } from '../coach';
+import { TabIcon } from '../components/TabIcon';
 import { useStore } from '../store';
-import { colors, font, radius, space } from '../theme';
+import { colors, fonts, font, radius, shadow, space } from '../theme';
 import { formatWeight } from '../utils';
 
-const ACCENT: Record<SuggestionKind, string> = {
-  start: colors.textDim,
-  progress: colors.accent,
-  hold: colors.blue,
-  deload: colors.warn,
-  pr: colors.accent,
-};
-
-const TAG: Record<SuggestionKind, string> = {
-  start: 'GET STARTED',
-  progress: 'PROGRESS',
-  hold: 'HOLD',
-  deload: 'DELOAD',
-  pr: 'NEW PR 🎉',
+// Each suggestion kind gets a Cal-AI-style tinted pill (soft bg + bold color).
+const TAGS: Record<SuggestionKind, { label: string; color: string; tint: string }> = {
+  start: { label: 'GET STARTED', color: colors.textDim, tint: colors.surfaceAlt },
+  progress: { label: 'PROGRESS', color: colors.blue, tint: colors.blueTint },
+  hold: { label: 'HOLD', color: colors.text, tint: colors.surfaceAlt },
+  deload: { label: 'DELOAD', color: colors.orange, tint: colors.orangeTint },
+  pr: { label: 'NEW PR', color: colors.green, tint: colors.greenTint },
 };
 
 export function CoachScreen() {
@@ -42,7 +36,7 @@ export function CoachScreen() {
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {!hasAny ? (
           <View style={styles.empty}>
-            <Text style={styles.emptyEmoji}>🧠</Text>
+            <TabIcon name="coach" color={colors.textFaint} size={52} />
             <Text style={styles.emptyTitle}>Your coach is warming up</Text>
             <Text style={styles.emptyText}>
               Add exercises and log your sets. Your coach reads your history and hands you the next
@@ -67,20 +61,22 @@ export function CoachScreen() {
 }
 
 function SuggestionCard({ name, s, unit }: { name: string; s: Suggestion; unit: string }) {
-  const accent = ACCENT[s.kind];
+  const tag = TAGS[s.kind];
   return (
-    <View style={[styles.card, { borderLeftColor: accent }]}>
+    <View style={styles.card}>
       <View style={styles.cardTop}>
         <Text style={styles.exName}>{name}</Text>
-        <Text style={[styles.tag, { color: accent }]}>{TAG[s.kind]}</Text>
+        <View style={[styles.tag, { backgroundColor: tag.tint }]}>
+          <Text style={[styles.tagText, { color: tag.color }]}>{tag.label}</Text>
+        </View>
       </View>
       <Text style={styles.headline}>{s.headline}</Text>
       <Text style={styles.detail}>{s.detail}</Text>
       {s.target ? (
         <View style={styles.targetRow}>
-          <View style={[styles.targetChip, { backgroundColor: accent }]}>
+          <View style={styles.targetChip}>
             <Text style={styles.targetText}>
-              🎯 {formatWeight(s.target.weight)} {unit} × {s.target.reps}
+              Next: {formatWeight(s.target.weight)} {unit} × {s.target.reps}
             </Text>
           </View>
         </View>
@@ -91,34 +87,38 @@ function SuggestionCard({ name, s, unit }: { name: string; s: Suggestion; unit: 
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  header: { paddingHorizontal: space.lg, paddingBottom: space.md },
-  title: { color: colors.text, fontSize: font.display, fontWeight: '800', letterSpacing: -0.5 },
-  subtitle: { color: colors.textDim, fontSize: font.small, marginTop: 2 },
+  header: { paddingHorizontal: space.lg, paddingTop: space.sm, paddingBottom: space.lg },
+  title: { color: colors.text, fontSize: font.display, fontFamily: fonts.black, letterSpacing: -0.5 },
+  subtitle: { color: colors.textDim, fontSize: font.small, fontFamily: fonts.regular, marginTop: 2 },
   scroll: { paddingHorizontal: space.lg, paddingBottom: space.xxl * 2 },
   intro: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceSunken,
     borderRadius: radius.md,
     padding: space.lg,
     marginBottom: space.md,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  introText: { color: colors.textDim, fontSize: font.small, lineHeight: 20 },
+  introText: { color: colors.textDim, fontSize: font.small, fontFamily: fonts.semibold, lineHeight: 20 },
   card: {
     backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    borderLeftWidth: 4,
+    borderRadius: radius.lg,
     padding: space.lg,
     marginBottom: space.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadow,
   },
   cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: space.sm },
-  exName: { color: colors.text, fontSize: font.h2, fontWeight: '700', flex: 1 },
-  tag: { fontSize: font.tiny, fontWeight: '800', letterSpacing: 0.5 },
-  headline: { color: colors.text, fontSize: font.body, fontWeight: '700', marginBottom: 6 },
-  detail: { color: colors.textDim, fontSize: font.small, lineHeight: 20 },
+  exName: { color: colors.text, fontSize: font.h2, fontFamily: fonts.bold, flex: 1 },
+  tag: { borderRadius: radius.pill, paddingHorizontal: space.md, paddingVertical: 5 },
+  tagText: { fontSize: font.tiny, fontFamily: fonts.black, letterSpacing: 0.5 },
+  headline: { color: colors.text, fontSize: font.body, fontFamily: fonts.bold, marginBottom: 6 },
+  detail: { color: colors.textDim, fontSize: font.small, fontFamily: fonts.regular, lineHeight: 20 },
   targetRow: { flexDirection: 'row', marginTop: space.md },
-  targetChip: { borderRadius: radius.pill, paddingHorizontal: space.lg, paddingVertical: space.sm },
-  targetText: { color: colors.bg, fontSize: font.small, fontWeight: '800' },
-  empty: { alignItems: 'center', paddingVertical: space.xxl, paddingHorizontal: space.lg },
-  emptyEmoji: { fontSize: 44, marginBottom: space.md },
-  emptyTitle: { color: colors.text, fontSize: font.title, fontWeight: '800', marginBottom: space.sm },
-  emptyText: { color: colors.textDim, fontSize: font.body, textAlign: 'center', lineHeight: 22 },
+  targetChip: { backgroundColor: colors.black, borderRadius: radius.pill, paddingHorizontal: space.lg, paddingVertical: space.sm },
+  targetText: { color: colors.white, fontSize: font.small, fontFamily: fonts.bold },
+  empty: { alignItems: 'center', paddingVertical: space.xxl, paddingHorizontal: space.lg, gap: space.md },
+  emptyTitle: { color: colors.text, fontSize: font.title, fontFamily: fonts.black },
+  emptyText: { color: colors.textDim, fontSize: font.body, fontFamily: fonts.regular, textAlign: 'center', lineHeight: 22 },
 });

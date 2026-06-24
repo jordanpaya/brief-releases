@@ -1,26 +1,47 @@
-// Central design tokens. Dark, minimal, high-contrast — built for fast logging
-// at the gym with one thumb.
+// Design tokens — Cal AI inspired: clean white canvas, near-black ink, rounded
+// type, soft-shadow cards, and small tinted color pills as the only accents.
 
 export const colors = {
-  bg: '#0B0B0F',
-  surface: '#16161D',
-  surfaceAlt: '#1F1F29',
-  border: '#2A2A36',
-  text: '#F5F5F7',
-  textDim: '#9A9AA8',
-  textFaint: '#5E5E6E',
-  accent: '#3DDC97', // growth green
-  accentDim: '#1E5C46',
-  blue: '#5B8DEF',
-  warn: '#F5A524',
-  danger: '#F25555',
+  bg: '#FFFFFF',
+  surface: '#FFFFFF',
+  surfaceAlt: '#F4F4F5', // light gray fills (steppers, chips, badges)
+  surfaceSunken: '#FAFAFA',
+  border: '#ECECEE',
+  borderStrong: '#E3E3E6',
+
+  text: '#0A0A0A',
+  textDim: '#8E8E93',
+  textFaint: '#BFBFC4',
+
+  black: '#0A0A0A',
   white: '#FFFFFF',
+
+  // Cal AI style color highlights — used sparingly, always as tinted pills.
+  green: '#34C759',
+  greenTint: '#E7F9EE',
+  orange: '#FF9500',
+  orangeTint: '#FFF3E2',
+  blue: '#0A84FF',
+  blueTint: '#E8F1FF',
+  red: '#FF3B30',
+  redTint: '#FFECEB',
+
+  // legacy alias so any stragglers resolve to the primary ink color
+  accent: '#0A0A0A',
+};
+
+// Rounded geometric family (Nunito) — the heart of the modern, friendly look.
+export const fonts = {
+  regular: 'Nunito_500Medium',
+  semibold: 'Nunito_700Bold',
+  bold: 'Nunito_800ExtraBold',
+  black: 'Nunito_900Black',
 };
 
 export const radius = {
-  sm: 10,
-  md: 16,
-  lg: 22,
+  sm: 14,
+  md: 20,
+  lg: 28,
   pill: 999,
 };
 
@@ -34,8 +55,6 @@ export const space = {
 };
 
 export const font = {
-  // Sizes only — RN uses the platform system font by default, which keeps the
-  // bundle tiny and the look native.
   display: 34,
   title: 24,
   h2: 19,
@@ -43,3 +62,12 @@ export const font = {
   small: 13,
   tiny: 11,
 };
+
+// Soft, diffuse card shadow (iOS) + elevation (Android).
+export const shadow = {
+  shadowColor: '#000000',
+  shadowOpacity: 0.06,
+  shadowRadius: 16,
+  shadowOffset: { width: 0, height: 6 },
+  elevation: 3,
+} as const;
