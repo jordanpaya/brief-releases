@@ -59,6 +59,24 @@ export function formatWeight(n: number): string {
   return Number.isInteger(n) ? String(n) : n.toFixed(1);
 }
 
+// Compare a set against the matching set from last time. This is the core of
+// the app: are you progressively overloading vs last week?
+export type Dir = 'up' | 'down' | 'same' | 'new';
+
+export function compareSet(
+  cur: { weight: number; reps: number },
+  prev?: { weight: number; reps: number },
+): { dir: Dir; short: string } {
+  if (!prev) return { dir: 'new', short: '–' };
+  const wd = cur.weight - prev.weight;
+  if (Math.abs(wd) >= 0.01) {
+    return { dir: wd > 0 ? 'up' : 'down', short: `${wd > 0 ? '↑' : '↓'}${formatWeight(Math.abs(wd))}` };
+  }
+  const rd = cur.reps - prev.reps;
+  if (rd !== 0) return { dir: rd > 0 ? 'up' : 'down', short: `${rd > 0 ? '↑' : '↓'}${Math.abs(rd)}r` };
+  return { dir: 'same', short: '=' };
+}
+
 // The sets from the most recent day strictly before `excludeDate`, in order.
 // This is the "Previous" reference column — what you did last time.
 export function getPreviousSession(sets: SetEntry[], excludeDate: string): SetEntry[] {
