@@ -5,7 +5,7 @@ import { todayISO, uid } from './utils';
 
 const STORAGE_KEY = 'liftlog.v1';
 
-const EMPTY: AppData = { exercises: [], sets: [], unit: 'lb' };
+const EMPTY: AppData = { exercises: [], sets: [], unit: 'lb', showRIR: false };
 
 type Store = {
   ready: boolean;
@@ -13,10 +13,11 @@ type Store = {
   addExercise: (name: string) => Exercise | null;
   removeExercise: (id: string) => void;
   renameExercise: (id: string, name: string) => void;
-  addSet: (exerciseId: string, weight: number, reps: number) => void;
-  updateSet: (id: string, weight: number, reps: number) => void;
+  addSet: (exerciseId: string, weight: number, reps: number, rir?: number) => void;
+  updateSet: (id: string, weight: number, reps: number, rir?: number) => void;
   removeSet: (id: string) => void;
   setUnit: (unit: Unit) => void;
+  setShowRIR: (v: boolean) => void;
   setsFor: (exerciseId: string) => SetEntry[];
   lastSet: (exerciseId: string) => SetEntry | null;
   todaysSets: (exerciseId: string) => SetEntry[];
@@ -40,6 +41,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             exercises: parsed.exercises ?? [],
             sets: parsed.sets ?? [],
             unit: parsed.unit ?? 'lb',
+            showRIR: parsed.showRIR ?? false,
           });
         }
       } catch {
@@ -86,24 +88,27 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }));
   }, []);
 
-  const addSet = useCallback<Store['addSet']>((exerciseId, weight, reps) => {
+  const addSet = useCallback<Store['addSet']>((exerciseId, weight, reps, rir) => {
     if (weight < 0 || reps <= 0) return;
     const entry: SetEntry = {
       id: uid(),
       exerciseId,
       weight,
       reps,
+      rir: rir == null || Number.isNaN(rir) ? undefined : rir,
       date: todayISO(),
       createdAt: Date.now(),
     };
     setData((d) => ({ ...d, sets: [...d.sets, entry] }));
   }, []);
 
-  const updateSet = useCallback<Store['updateSet']>((id, weight, reps) => {
+  const updateSet = useCallback<Store['updateSet']>((id, weight, reps, rir) => {
     if (weight < 0 || reps <= 0) return;
     setData((d) => ({
       ...d,
-      sets: d.sets.map((s) => (s.id === id ? { ...s, weight, reps } : s)),
+      sets: d.sets.map((s) =>
+        s.id === id ? { ...s, weight, reps, rir: rir == null || Number.isNaN(rir) ? undefined : rir } : s,
+      ),
     }));
   }, []);
 
@@ -113,6 +118,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const setUnit = useCallback<Store['setUnit']>((unit) => {
     setData((d) => ({ ...d, unit }));
+  }, []);
+
+  const setShowRIR = useCallback<Store['setShowRIR']>((v) => {
+    setData((d) => ({ ...d, showRIR: v }));
   }, []);
 
   const setsFor = useCallback<Store['setsFor']>(
@@ -152,6 +161,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     updateSet,
     removeSet,
     setUnit,
+    setShowRIR,
     setsFor,
     lastSet,
     todaysSets,

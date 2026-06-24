@@ -22,11 +22,13 @@ function Cell({
   initial,
   onCommit,
   kind,
+  width,
   placeholder,
 }: {
   initial: string;
   onCommit: (raw: string) => void;
   kind: 'weight' | 'reps';
+  width: number;
   placeholder?: string;
 }) {
   const [t, setT] = useState(initial);
@@ -38,7 +40,7 @@ function Cell({
 
   return (
     <TextInput
-      style={[styles.cell, focused && styles.cellFocus]}
+      style={[styles.cell, { width }, focused && styles.cellFocus]}
       value={t}
       placeholder={placeholder}
       placeholderTextColor={colors.textFaint}
@@ -64,35 +66,43 @@ const DELTA_STYLE: Record<Dir, { bg: string; fg: string }> = {
   new: { bg: colors.surfaceAlt, fg: colors.textFaint },
 };
 
-function Delta({ dir, short }: { dir: Dir; short: string }) {
+function Delta({ dir, short, width }: { dir: Dir; short: string; width: number }) {
   const c = DELTA_STYLE[dir];
   return (
-    <View style={[styles.delta, { backgroundColor: c.bg }]}>
+    <View style={[styles.delta, { width, backgroundColor: c.bg }]}>
       <Text style={[styles.deltaText, { color: c.fg }]}>{short}</Text>
     </View>
   );
 }
 
-type Entry = { weight: string; reps: string };
+type Entry = { weight: string; reps: string; rir: string };
 
 export function LogScreen() {
-  const { data, addExercise, removeExercise, renameExercise, addSet, updateSet, removeSet, setUnit, lastSet, todaysSets, setsFor } =
+  const { data, addExercise, removeExercise, renameExercise, addSet, updateSet, removeSet, setUnit, setShowRIR, lastSet, todaysSets, setsFor } =
     useStore();
-  const { exercises, unit } = data;
+  const { exercises, unit, showRIR } = data;
 
   const [expanded, setExpanded] = useState<string | null>(null);
   const [entries, setEntries] = useState<Record<string, Entry>>({});
   const [showAdd, setShowAdd] = useState(false);
   const [newName, setNewName] = useState('');
 
+  // Column widths flex a little to make room for RIR when it's on.
+  const wLb = showRIR ? 48 : 54;
+  const wReps = showRIR ? 42 : 54;
+  const wRir = 38;
+  const wVs = showRIR ? 50 : 56;
+
   const defaultEntry = useMemo<Entry>(
-    () => ({ weight: String(unit === 'kg' ? 20 : 45), reps: '5' }),
+    () => ({ weight: String(unit === 'kg' ? 20 : 45), reps: '5', rir: '' }),
     [unit],
   );
 
   function seedEntry(id: string): Entry {
     const last = lastSet(id);
-    return last ? { weight: formatWeight(last.weight), reps: String(last.reps) } : defaultEntry;
+    return last
+      ? { weight: formatWeight(last.weight), reps: String(last.reps), rir: last.rir != null ? String(last.rir) : '' }
+      : defaultEntry;
   }
 
   const entryFor = (id: string): Entry => entries[id] ?? seedEntry(id);
@@ -109,12 +119,18 @@ export function LogScreen() {
     });
   }
 
+  function parseRIR(raw: string): number | undefined {
+    if (raw.trim() === '') return undefined;
+    const n = parseInt(raw, 10);
+    return Number.isNaN(n) ? undefined : n;
+  }
+
   function commitEntry(id: string) {
     const e = entryFor(id);
     const w = parseFloat(e.weight);
     const r = parseInt(e.reps, 10);
     if (Number.isNaN(w) || w < 0 || Number.isNaN(r) || r <= 0) return;
-    addSet(id, w, r);
+    addSet(id, w, r, parseRIR(e.rir));
   }
 
   function onCreateExercise() {
@@ -154,7 +170,6 @@ export function LogScreen() {
     ]);
   }
 
-  // "Beating / matching / down vs last week" read for an expanded card.
   function weekSummary(today: SetEntry[], prev: SetEntry[]): { text: string; color: string } | null {
     if (today.length === 0 || prev.length === 0) return null;
     const t = Math.max(...today.map((s) => estimate1RM(s.weight, s.reps)));
@@ -171,11 +186,20 @@ export function LogScreen() {
           <Text style={styles.title}>Lift Log</Text>
           <Text style={styles.subtitle}>Beat last week, set by set</Text>
         </View>
-        <Pressable style={styles.unitToggle} onPress={() => setUnit(unit === 'lb' ? 'kg' : 'lb')} hitSlop={8}>
-          <Text style={[styles.unitText, unit === 'lb' && styles.unitActive]}>lb</Text>
-          <Text style={styles.unitSlash}>/</Text>
-          <Text style={[styles.unitText, unit === 'kg' && styles.unitActive]}>kg</Text>
-        </Pressable>
+        <View style={styles.toggles}>
+          <Pressable
+            style={[styles.rirToggle, showRIR && styles.rirToggleOn]}
+            onPress={() => setShowRIR(!showRIR)}
+            hitSlop={8}
+          >
+            <Text style={[styles.rirToggleText, showRIR && styles.rirToggleTextOn]}>RIR</Text>
+          </Pressable>
+          <Pressable style={styles.unitToggle} onPress={() => setUnit(unit === 'lb' ? 'kg' : 'lb')} hitSlop={8}>
+            <Text style={[styles.unitText, unit === 'lb' && styles.unitActive]}>lb</Text>
+            <Text style={styles.unitSlash}>/</Text>
+            <Text style={[styles.unitText, unit === 'kg' && styles.unitActive]}>kg</Text>
+          </Pressable>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
@@ -195,10 +219,6 @@ export function LogScreen() {
             const prev = open ? getPreviousSession(setsFor(ex.id), todayISO()) : [];
             const entry = entryFor(ex.id);
             const summary = open ? weekSummary(today, prev) : null;
-            const prevText = (i: number) => {
-              const p = prev[i];
-              return p ? `${formatWeight(p.weight)} × ${p.reps}` : '—';
-            };
             return (
               <View key={ex.id} style={styles.card}>
                 <Pressable onPress={() => toggle(ex.id)} onLongPress={() => onLongPress(ex)}>
@@ -231,13 +251,15 @@ export function LogScreen() {
                     <View style={styles.row}>
                       <Text style={[styles.hSet, styles.colHead]}>SET</Text>
                       <Text style={[styles.hPrev, styles.colHead]}>LAST WEEK</Text>
-                      <Text style={[styles.hCell, styles.colHead]}>{unit.toUpperCase()}</Text>
-                      <Text style={[styles.hCell, styles.colHead]}>REPS</Text>
-                      <Text style={[styles.hDelta, styles.colHead]}>VS</Text>
+                      <Text style={[styles.colHead, { width: wLb, textAlign: 'center' }]}>{unit.toUpperCase()}</Text>
+                      <Text style={[styles.colHead, { width: wReps, textAlign: 'center' }]}>REPS</Text>
+                      {showRIR ? <Text style={[styles.colHead, { width: wRir, textAlign: 'center' }]}>RIR</Text> : null}
+                      <Text style={[styles.colHead, { width: wVs, textAlign: 'center' }]}>VS</Text>
                     </View>
 
                     {today.map((s: SetEntry, i: number) => {
-                      const cmp = compareSet(s, prev[i]);
+                      const p = prev[i];
+                      const cmp = compareSet(s, p);
                       return (
                         <Pressable
                           key={s.id}
@@ -249,24 +271,42 @@ export function LogScreen() {
                               <Text style={styles.setBadgeText}>{i + 1}</Text>
                             </View>
                           </View>
-                          <Text style={styles.prev} numberOfLines={1}>{prevText(i)}</Text>
+                          <View style={styles.prevWrap}>
+                            <Text style={styles.prev} numberOfLines={1}>
+                              {p ? `${formatWeight(p.weight)} × ${p.reps}` : '—'}
+                            </Text>
+                            {showRIR && p && p.rir != null ? (
+                              <Text style={styles.prevRir}>{p.rir} RIR</Text>
+                            ) : null}
+                          </View>
                           <Cell
                             initial={formatWeight(s.weight)}
                             kind="weight"
+                            width={wLb}
                             onCommit={(raw) => {
                               const n = parseFloat(raw);
-                              if (!Number.isNaN(n) && n >= 0) updateSet(s.id, n, s.reps);
+                              if (!Number.isNaN(n) && n >= 0) updateSet(s.id, n, s.reps, s.rir);
                             }}
                           />
                           <Cell
                             initial={String(s.reps)}
                             kind="reps"
+                            width={wReps}
                             onCommit={(raw) => {
                               const n = parseInt(raw, 10);
-                              if (!Number.isNaN(n) && n > 0) updateSet(s.id, s.weight, n);
+                              if (!Number.isNaN(n) && n > 0) updateSet(s.id, s.weight, n, s.rir);
                             }}
                           />
-                          <Delta dir={cmp.dir} short={cmp.short} />
+                          {showRIR ? (
+                            <Cell
+                              initial={s.rir != null ? String(s.rir) : ''}
+                              kind="reps"
+                              width={wRir}
+                              placeholder="–"
+                              onCommit={(raw) => updateSet(s.id, s.weight, s.reps, parseRIR(raw))}
+                            />
+                          ) : null}
+                          <Delta dir={cmp.dir} short={cmp.short} width={wVs} />
                         </Pressable>
                       );
                     })}
@@ -278,10 +318,17 @@ export function LogScreen() {
                           <Text style={styles.setBadgeNextText}>{today.length + 1}</Text>
                         </View>
                       </View>
-                      <Text style={[styles.prev, styles.prevFaint]} numberOfLines={1}>{prevText(today.length)}</Text>
-                      <Cell initial={entry.weight} kind="weight" placeholder="0" onCommit={(raw) => setEntry(ex.id, { weight: raw })} />
-                      <Cell initial={entry.reps} kind="reps" placeholder="0" onCommit={(raw) => setEntry(ex.id, { reps: raw })} />
-                      <Pressable style={[styles.delta, styles.logBtn]} onPress={() => commitEntry(ex.id)} hitSlop={6}>
+                      <View style={styles.prevWrap}>
+                        <Text style={[styles.prev, styles.prevFaint]} numberOfLines={1}>
+                          {prev[today.length] ? `${formatWeight(prev[today.length].weight)} × ${prev[today.length].reps}` : '—'}
+                        </Text>
+                      </View>
+                      <Cell initial={entry.weight} kind="weight" width={wLb} placeholder="0" onCommit={(raw) => setEntry(ex.id, { weight: raw })} />
+                      <Cell initial={entry.reps} kind="reps" width={wReps} placeholder="0" onCommit={(raw) => setEntry(ex.id, { reps: raw })} />
+                      {showRIR ? (
+                        <Cell initial={entry.rir} kind="reps" width={wRir} placeholder="–" onCommit={(raw) => setEntry(ex.id, { rir: raw })} />
+                      ) : null}
+                      <Pressable style={[styles.delta, styles.logBtn, { width: wVs }]} onPress={() => commitEntry(ex.id)} hitSlop={6}>
                         <Text style={styles.logBtnText}>✓</Text>
                       </Pressable>
                     </View>
@@ -330,9 +377,6 @@ export function LogScreen() {
   );
 }
 
-const CELL_W = 54;
-const DELTA_W = 56;
-
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   header: {
@@ -345,6 +389,16 @@ const styles = StyleSheet.create({
   },
   title: { color: colors.text, fontSize: font.display, fontFamily: fonts.black, letterSpacing: -0.5 },
   subtitle: { color: colors.textDim, fontSize: font.small, fontFamily: fonts.regular, marginTop: 2 },
+  toggles: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginTop: space.sm },
+  rirToggle: {
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.pill,
+    paddingHorizontal: space.md,
+    paddingVertical: space.sm,
+  },
+  rirToggleOn: { backgroundColor: colors.black },
+  rirToggleText: { color: colors.textFaint, fontSize: font.body, fontFamily: fonts.bold },
+  rirToggleTextOn: { color: colors.white },
   unitToggle: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -352,7 +406,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     paddingHorizontal: space.md,
     paddingVertical: space.sm,
-    marginTop: space.sm,
   },
   unitText: { color: colors.textFaint, fontSize: font.body, fontFamily: fonts.bold },
   unitActive: { color: colors.black },
@@ -388,8 +441,6 @@ const styles = StyleSheet.create({
   colHead: { color: colors.textFaint, fontSize: font.tiny, fontFamily: fonts.bold, letterSpacing: 0.6 },
   hSet: { width: 28 },
   hPrev: { flex: 1, paddingLeft: 2 },
-  hCell: { width: CELL_W, textAlign: 'center' },
-  hDelta: { width: DELTA_W, textAlign: 'center' },
 
   setBadgeWrap: { width: 28 },
   setBadge: {
@@ -403,11 +454,12 @@ const styles = StyleSheet.create({
   setBadgeText: { color: colors.text, fontSize: font.small, fontFamily: fonts.black },
   setBadgeNext: { backgroundColor: colors.bg, borderWidth: 1.5, borderColor: colors.borderStrong },
   setBadgeNextText: { color: colors.textFaint, fontSize: font.small, fontFamily: fonts.black },
-  prev: { flex: 1, color: colors.textDim, fontSize: font.small, fontFamily: fonts.semibold, paddingLeft: 2 },
+  prevWrap: { flex: 1, paddingLeft: 2 },
+  prev: { color: colors.textDim, fontSize: font.small, fontFamily: fonts.semibold },
   prevFaint: { color: colors.textFaint },
+  prevRir: { color: colors.textFaint, fontSize: font.tiny, fontFamily: fonts.semibold, marginTop: 1 },
 
   cell: {
-    width: CELL_W,
     height: 42,
     borderRadius: radius.sm,
     backgroundColor: colors.surfaceAlt,
@@ -422,7 +474,6 @@ const styles = StyleSheet.create({
   cellFocus: { backgroundColor: colors.bg, borderColor: colors.black },
 
   delta: {
-    width: DELTA_W,
     height: 38,
     borderRadius: radius.sm,
     alignItems: 'center',

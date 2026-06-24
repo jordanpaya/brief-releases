@@ -11,6 +11,7 @@ export type SetEntry = {
   exerciseId: string;
   weight: number; // stored in the app's current unit at time of entry
   reps: number;
+  rir?: number; // reps in reserve (optional, only when RIR tracking is on)
   date: string; // local day, 'YYYY-MM-DD'
   createdAt: number;
 };
@@ -19,6 +20,7 @@ export type AppData = {
   exercises: Exercise[];
   sets: SetEntry[];
   unit: Unit;
+  showRIR: boolean;
 };
 
 // A workout "session" = all sets for one exercise on one day.
